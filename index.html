@@ -137,6 +137,19 @@
         .green { color: var(--main-color); }
         .dim { color: #6b7280; font-style: italic; }
         
+        .link {
+            color: var(--main-color);
+            text-decoration: underline;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .link:hover {
+            background: var(--main-color);
+            color: var(--bg-color);
+            text-decoration: none;
+        }
+        
         #real-input {
             position: absolute;
             opacity: 0;
@@ -190,9 +203,21 @@
             { t: "Initializing interactive shell...", d: 400, style: "dim" }
         ];
 
+        const blog = {
+            'google_vrp': {
+                title: "Gemini Sandbox Escape: The Silent Patch Theory",
+                date: "2026-01-06",
+                status: "<span style='color: #eab308'>UNDER REVIEW</span>", 
+                description: "An investigation into the sudden shift from UID 0 to UID 1000 in Google's AI environment. How 'hallucinations' led to the leak of internal KMS endpoints and production metadata, triggering a silent security response.",
+                pdf: "files/google_gemini_report_v1.pdf"
+            }    
+        };
+
         const commands = {
             help: [
                 "Available Commands:",
+                "  <span class='bold'>ls</span>             - List available data fragments (blog).",
+                "  <span class='bold'>cat &lt;name&gt;</span>     - Read a specific data fragment.",
                 "  <span class='bold'>google_intel</span>   - Query Google AI infrastructure.",
                 "  <span class='bold'>deepseek_scan</span>  - Initiate cluster scan for DeepSeek.",
                 "  <span class='bold'>openai_status</span>  - Check OpenAI's current operational status.",
@@ -322,14 +347,16 @@
         function run(cmd) {
             if(busy) return;
             
-            let clean = cmd.trim().toLowerCase();
+            let parts = cmd.trim().split(/\s+/);
+            let keyword = parts[0].toLowerCase();
+            let arg = parts[1] ? parts[1].toLowerCase() : null;
             
             let div = document.createElement('div');
             div.className = 'line';
             div.innerHTML = `<span class="prompt">guest@internet:~$</span><span class="green">${cmd}</span>`;
             out.appendChild(div);
             
-            if(clean === 'clear') {
+            if(keyword === 'clear') {
                 out.innerHTML = '';
                 realInp.value = '';
                 txt.innerText = '';
@@ -338,15 +365,59 @@
                 return;
             }
 
-            if(clean && commands[clean]) {
+            if(keyword === 'ls') {
+                let output = ["<span class='bold'>Available Data Fragments:</span>"];
+                for(let key in blog) {
+                    output.push(`  <span class='green'>${key}</span> - ${blog[key].title} <span class='dim'>[${blog[key].date}]</span>`);
+                }
+                output.push("<span class='dim'>Type 'cat &lt;name&gt;' to access fragment.</span>");
+                
                 busy = true;
                 inpLine.style.display = 'none';
-                typeLines(commands[clean]);
-            } else if (clean) {
+                typeLines(output);
+                realInp.value = '';
+                txt.innerText = '';
+                curVal = '';
+                return;
+            }
+
+            if(keyword === 'cat') {
+                if(!arg) {
+                    busy = true;
+                    inpLine.style.display = 'none';
+                    typeLines(["Usage: cat <article_name>"]);
+                } else if(blog[arg]) {
+                    let post = blog[arg];
+                    let output = [
+                        `<span class='bold' style='font-size:1.2em'>${post.title}</span>`,
+                        `Date:   ${post.date}`,
+                        `Status: <span class='green'>${post.status}</span>`,
+                        `Desc:   ${post.description}`,
+                        " ",
+                        `<a href='${post.pdf}' target='_blank' class='link'>[DOWNLOAD PDF DOCUMENT]</a>`
+                    ];
+                    busy = true;
+                    inpLine.style.display = 'none';
+                    typeLines(output);
+                } else {
+                    busy = true;
+                    inpLine.style.display = 'none';
+                    typeLines([`Error: Data fragment '${arg}' not found.`]);
+                }
+                realInp.value = '';
+                txt.innerText = '';
+                curVal = '';
+                return;
+            }
+
+            if(keyword && commands[keyword]) {
                 busy = true;
                 inpLine.style.display = 'none';
-                typeLines([`Command not found: ${cmd}. Type 'help'.`]);
-            } else {
+                typeLines(commands[keyword]);
+            } else if (keyword) {
+                busy = true;
+                inpLine.style.display = 'none';
+                typeLines([`Command not found: ${keyword}. Type 'help'.`]);
             }
             
             realInp.value = '';
