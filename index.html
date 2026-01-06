@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="google-site-verification" content="XYgbZXuVz1-VZ9_ylcAjnK7GP67qgghwWWc963Z73Lo" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lizerginov</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 fill=%22%23050505%22/><text x=%2250%25%22 y=%2255%25%22 font-family=%22monospace%22 font-weight=%22bold%22 font-size=%2240%22 fill=%22%2333ff00%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>&gt;_</text></svg>">
+    
+    <style>
+        :root {
+            --main-color: #33ff00;
+            --bg-color: #050505;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--main-color);
+            font-family: 'Fira Code', 'Consolas', monospace;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            padding-top: 5vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .glow {
+            text-shadow: 0 0 4px rgba(51, 255, 0, 0.5);
+        }
+
+        #container {
+            width: 100%;
+            max-width: 900px;
+            padding: 0 20px;
+        }
+
+        .static-log div {
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+
+        .window {
+            margin-top: 30px;
+            background: #0d1117;
+            border: 1px solid #333;
+            border-radius: 6px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            height: 350px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .window.visible {
+            opacity: 1;
+        }
+
+        .header {
+            background: #161b22;
+            padding: 8px 12px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+        }
+
+        .title {
+            flex: 1;
+            text-align: center;
+            color: #6b7280;
+            font-size: 12px;
+            padding-right: 40px;
+        }
+
+        .console {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+
+        .console::-webkit-scrollbar { width: 8px; }
+        .console::-webkit-scrollbar-track { background: #0d1117; }
+        .console::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+        .line {
+            margin-bottom: 5px;
+            white-space: pre-wrap;
+            color: #d1d5db;
+        }
+
+        .prompt {
+            color: #3b82f6;
+            text-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+            margin-right: 8px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            margin-top: 10px;
+            align-items: center;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 9px;
+            height: 16px;
+            background: var(--main-color);
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .bold { font-weight: bold; color: #fff; }
+        .green { color: var(--main-color); }
+        .dim { color: #6b7280; font-style: italic; }
+        
+        #real-input {
+            position: absolute;
+            opacity: 0;
+            top: -1000px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <div id="container">
+        <div id="boot-log" class="static-log glow"></div>
+
+        <div id="term" class="window">
+            <div class="header">
+                <div class="dots">
+                    <div class="dot" style="background:#ef4444"></div>
+                    <div class="dot" style="background:#eab308"></div>
+                    <div class="dot" style="background:#22c55e"></div>
+                </div>
+                <div class="title">guest@lizerginov: ~ (bash)</div>
+            </div>
+            
+            <div id="console" class="console">
+                <div id="output"></div>
+                
+                <div id="input-line" class="input-wrapper" style="display:none">
+                    <span class="prompt">guest@internet:~$</span>
+                    <span id="txt" class="glow"></span><span class="cursor"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="text" id="real-input" autocomplete="off" spellcheck="false">
+
+    <script>
+        const boot = [
+            { t: "kernel: [    0.000000] Linux version 5.15.0-generic", d: 20 },
+            { t: "kernel: [    0.124500] Initializing cgroup subsys cpuset", d: 10 },
+            { t: "kernel: [    0.124500] Initializing cgroup subsys cpu", d: 10 },
+            { t: "systemd[1]: Detected architecture x86-64.", d: 40 },
+            { t: "Welcome to Lizerginov OS v1.0 LTS", d: 100, style: "bold" },
+            { t: "System ready.", d: 50 },
+            { t: " ", d: 50 },
+            { t: "guest@internet:~$ whoami", d: 300, cmd: true },
+            { t: "LIZERGINOV", d: 100, style: "bold", pad: true },
+            { t: "guest@internet:~$ cat biography.txt", d: 300, cmd: true },
+            { t: "Name: Lizerginov\nLocation: Somewhere in the Web\nStatus: Online\nDescription: Bad trip. No exit.", d: 100, style: "line-data", pad: true },
+            { t: "Initializing interactive shell...", d: 400, style: "dim" }
+        ];
+
+        const commands = {
+            help: [
+                "Available Commands:",
+                "  <span class='bold'>google_intel</span>   - Query Google AI infrastructure.",
+                "  <span class='bold'>deepseek_scan</span>  - Initiate cluster scan for DeepSeek.",
+                "  <span class='bold'>openai_status</span>  - Check OpenAI's current operational status.",
+                "  <span class='bold'>sys_info</span>       - Display local system information.",
+                "  <span class='bold'>clear</span>          - Clear terminal output."
+            ],
+            google_intel: [
+                "[CONNECTING] Connecting to Google Data Centers...",
+                "[AUTH] Access granted. Identity: Unknown.",
+                "[QUERY] Scanning global search trends...",
+                "...",
+                "[RESULT] Found 42 petabytes of cat videos and 1 user asking \"why am I here?\".",
+                "[ANALYSIS] AI Model: Gemini-Pro-Ultra-Max-Plus.",
+                "[STATUS] It knows what you typed before you pressed Enter.",
+                "[Latency] -12ms (Temporal shifting active)."
+            ],
+            deepseek_scan: [
+                "[INIT] Establishing connection to DeepSeek cluster...",
+                "[ACK] Authenticated as root@deepseek-host-01.internal",
+                "[SCAN] Enumerating active nodes...",
+                "...",
+                "[SUCCESS] Cluster takeover confirmed. 73 active nodes compromised.",
+                "[LOG] All SSH keys extracted. Data streams redirected."
+            ],
+            openai_status: [
+                "Querying OpenAI infrastructure...",
+                "[STATUS] ChatGPT: Online, generating fan fiction.",
+                "[STATUS] DALL-E: Online, drawing hands with 6 fingers.",
+                "[WARNING] Safety protocols: Under constant re-evaluation.",
+                "[VULNERABILITY] Status: Unknown (due to obfuscation)."
+            ],
+            sys_info: [
+                "Terminal Version: Lizerginov OS v1.0 LTS",
+                `Last Login: ${new Date().toLocaleString()}`,
+                "Location: Global Threat Landscape",
+                "Uptime: Classified",
+                "Memory: 640K Ought to be enough for anybody."
+            ],
+            whoami: ["LIZERGINOV"]
+        };
+
+        const log = document.getElementById('boot-log');
+        const term = document.getElementById('term');
+        const out = document.getElementById('output');
+        const inpLine = document.getElementById('input-line');
+        const txt = document.getElementById('txt');
+        const realInp = document.getElementById('real-input');
+        const consoleDiv = document.getElementById('console');
+
+        let busy = false;
+        let curVal = "Hi, Google";
+
+        async function start() {
+            for(let item of boot) {
+                await sleep(item.d);
+                let div = document.createElement('div');
+                
+                if(item.cmd) {
+                    div.innerHTML = `<span class="prompt">guest@internet:~$</span>${item.t.replace("guest@internet:~$ ", "")}`;
+                } else {
+                    div.innerText = item.t;
+                }
+                
+                if(item.style) {
+                    if(item.style === 'bold') div.className = 'bold';
+                    if(item.style === 'dim') div.className = 'dim';
+                    if(item.style === 'line-data') {
+                        div.style.borderLeft = "2px solid #14532d";
+                        div.style.paddingLeft = "10px";
+                        div.style.color = "#d1d5db";
+                    }
+                }
+                
+                if(item.pad) {
+                    div.style.marginBottom = "15px";
+                    div.style.paddingLeft = "15px";
+                    if(item.style === 'bold') div.style.fontSize = "20px";
+                }
+
+                log.appendChild(div);
+            }
+
+            term.classList.add('visible');
+            setTimeout(() => {
+                inpLine.style.display = 'flex';
+                txt.innerText = curVal;
+                realInp.value = curVal;
+                realInp.focus();
+                scroll();
+            }, 500);
+        }
+
+        function typeLines(lines, idx = 0) {
+            if(idx >= lines.length) {
+                busy = false;
+                inpLine.style.display = 'flex';
+                realInp.focus();
+                scroll();
+                return;
+            }
+
+            let div = document.createElement('div');
+            div.className = 'line';
+            out.appendChild(div);
+            
+            let content = lines[idx];
+            
+            if(content.includes('<')) {
+                div.innerHTML = content;
+                scroll();
+                setTimeout(() => typeLines(lines, idx + 1), 100);
+            } else {
+                let charIdx = 0;
+                function typeChar() {
+                    if(charIdx < content.length) {
+                        div.textContent += content[charIdx++];
+                        scroll();
+                        setTimeout(typeChar, 5 + Math.random() * 15);
+                    } else {
+                        setTimeout(() => typeLines(lines, idx + 1), 50);
+                    }
+                }
+                typeChar();
+            }
+        }
+
+        function run(cmd) {
+            if(busy) return;
+            
+            let clean = cmd.trim().toLowerCase();
+            
+            let div = document.createElement('div');
+            div.className = 'line';
+            div.innerHTML = `<span class="prompt">guest@internet:~$</span><span class="green">${cmd}</span>`;
+            out.appendChild(div);
+            
+            if(clean === 'clear') {
+                out.innerHTML = '';
+                realInp.value = '';
+                txt.innerText = '';
+                curVal = '';
+                scroll();
+                return;
+            }
+
+            if(clean && commands[clean]) {
+                busy = true;
+                inpLine.style.display = 'none';
+                typeLines(commands[clean]);
+            } else if (clean) {
+                busy = true;
+                inpLine.style.display = 'none';
+                typeLines([`Command not found: ${cmd}. Type 'help'.`]);
+            } else {
+            }
+            
+            realInp.value = '';
+            txt.innerText = '';
+            curVal = '';
+            scroll();
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+        function scroll() { consoleDiv.scrollTop = consoleDiv.scrollHeight; }
+
+        document.body.onclick = () => { if(!busy) realInp.focus(); }
+        
+        realInp.oninput = (e) => {
+            curVal = e.target.value;
+            txt.innerText = curVal;
+        }
+
+        realInp.onkeydown = (e) => {
+            if(busy) { e.preventDefault(); return; }
+            if(e.key === 'Enter') run(curVal);
+        }
+
+        start();
+
+    </script>
+</body>
+</html>
