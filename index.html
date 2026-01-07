@@ -149,6 +149,25 @@
             color: var(--bg-color);
             text-decoration: none;
         }
+
+        /* Styles for copyable elements */
+        .copyable {
+            cursor: pointer;
+            border-bottom: 1px dashed #666;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .copyable:hover {
+            background: #222;
+            color: #fff;
+            border-bottom-style: solid;
+        }
+
+        .copyable:active {
+            background: var(--main-color);
+            color: #000;
+        }
         
         #real-input {
             position: absolute;
@@ -222,6 +241,7 @@
                 "  <span class='bold'>deepseek_scan</span>  - Initiate cluster scan for DeepSeek.",
                 "  <span class='bold'>openai_status</span>  - Check OpenAI's current operational status.",
                 "  <span class='bold'>sys_info</span>       - Display local system information.",
+                "  <span class='bold'>donate</span>         - Support the project.",
                 "  <span class='bold'>clear</span>          - Clear terminal output."
             ],
             google_intel: [
@@ -255,6 +275,17 @@
                 "Location: Global Threat Landscape",
                 "Uptime: Classified",
                 "Memory: 640K Ought to be enough for anybody."
+            ],
+            donate: [
+                "Your support helps maintain infrastructure and ensures future disclosures stay accessible.",
+                " ",
+                "<span class='bold'>BTC:</span> <span class='copyable' onclick='copyText(this, \"bc1qzghy0gmznem5yg4fdw0w9yjcgpdgggd2jsu3r7\")'>bc1qzghy0gmznem5yg4fdw0w9yjcgpdgggd2jsu3r7</span>",
+                " ",
+                "<span class='bold'>TON:</span> <span class='copyable' onclick='copyText(this, \"UQDXoeiQIwz_BQKkUQqTsz3ovfnYoQpD_CjfojrroZ91wB35\")'>UQDXoeiQIwz_BQKkUQqTsz3ovfnYoQpD_CjfojrroZ91wB35</span>",
+                " ",
+                "<span class='bold'>ETH:</span> <span class='copyable' onclick='copyText(this, \"0x449f2157C2d681B0AAaBb90B991Fa3542B89e7E4\")'>0x449f2157C2d681B0AAaBb90B991Fa3542B89e7E4</span>",
+                " ",
+                "Status: <span class='green bold'>[ACTIVE]</span> | Thank you for your support."
             ],
             whoami: ["LIZERGINOV"]
         };
@@ -426,10 +457,27 @@
             scroll();
         }
 
+        function copyText(el, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const original = el.innerText;
+                el.innerText = "[COPIED]";
+                el.style.color = "#33ff00";
+                setTimeout(() => {
+                    el.innerText = original;
+                    el.style.color = "";
+                }, 1000);
+            });
+        }
+
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         function scroll() { consoleDiv.scrollTop = consoleDiv.scrollHeight; }
 
-        document.body.onclick = () => { if(!busy) realInp.focus(); }
+        document.body.onclick = (e) => { 
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) return;
+            if (e.target.classList.contains('copyable')) return;
+            if (!busy) realInp.focus(); 
+        }
         
         realInp.oninput = (e) => {
             curVal = e.target.value;
